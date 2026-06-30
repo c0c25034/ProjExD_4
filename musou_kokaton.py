@@ -161,18 +161,18 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird, angle: float = 0):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん
         """
         super().__init__()
         self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
-        self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
-        self.vx = math.cos(math.radians(angle))
-        self.vy = -math.sin(math.radians(angle))
+        base_angle = math.degrees(math.atan2(-self.vy, self.vx))
+        total_angle = base_angle + angle
+        self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), total_angle, 1.0)
+        self.vx = math.cos(math.radians(total_angle))
+        self.vy = -math.sin(math.radians(total_angle))
         self.rect = self.image.get_rect()
         self.rect.centery = bird.rect.centery + bird.rect.height * self.vy
         self.rect.centerx = bird.rect.centerx + bird.rect.width * self.vx
@@ -187,7 +187,23 @@ class Beam(pg.sprite.Sprite):
         if check_bound(self.rect) != (True, True):
             self.kill()
 
+class NeoBeam:
+    """
+    追加機能６：弾幕（複数方向へのビーム）に関するクラス
+    """
+    def __init__(self, bird: Bird, num: int):
+        self.bird = bird
+        self.num = num
 
+    def blit(self) -> list[Beam]:
+        beams = []
+        # -50度から+50度の範囲を(num-1)分割してステップを計算
+        step = 100 / (self.num - 1)
+        for i in range(self.num):
+            angle = -50 + step * i
+            # 各角度を持ったBeamを生成してリストに追加
+            beams.append(Beam(self.bird, angle))
+        return beams
 class Explosion(pg.sprite.Sprite):
     """
     爆発に関するクラス
@@ -403,6 +419,9 @@ def main():
 
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.KEYDOWN and event.key == pg.K_LSHIFT:# 追加機能６：左Shiftキー (K_LSHIFT) が押されたら弾幕発射
+                neobeam = NeoBeam(bird, 5)
+                beams.add(*neobeam.blit())# * を付けることでリストを展開してGroupにまとめて追加する
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                 if score.value >= 200:  # 後で200に
                     gravity.add(Gravity(400))
@@ -438,15 +457,13 @@ def main():
                 exps.add(Explosion(bomb, 50))
                 score.value += 1
             else:
+                life.num -= 1
                 bird.change_img(8, screen)
-        for bomb in pg.sprite.spritecollide(bird, bombs, True):  # こうかとんと衝突した爆弾リスト
-            life.num -= 1
-            if life.num <= 0:
-                bird.change_img(8, screen)  # こうかとん悲しみエフェクト
-                score.update(screen)
-                pg.display.update()
-                time.sleep(2)
-                return
+                if life.num <= 0:
+                    score.update(screen)
+                    pg.display.update()
+                    time.sleep(2)
+                    return
         
         if key_lst[pg.K_s] and score.value > 50 and len(shields) == 0:
             score.value -= 50
@@ -455,10 +472,6 @@ def main():
         shields.update()
         shields.draw(screen)
         pg.sprite.groupcollide(bombs, shields, True, False)
-
-        
-        if pg.sprite.spritecollide(bird, bombs, True):
-            life.num -= 1
 
         for emy in pg.sprite.groupcollide(emys, gravity, True, False).keys():
             exps.add(Explosion(emy, 100))  # 爆発エフェクト
