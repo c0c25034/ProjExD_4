@@ -245,6 +245,29 @@ class Enemy(pg.sprite.Sprite):
             self.state = "stop"
         self.rect.move_ip(self.vx, self.vy)
 
+shields = pg.sprite.Group()
+class Shield(pg.sprite.Sprite):
+    def __init__(self, bird: Bird, life: int):
+        super().__init__()
+        self.life = life
+        
+        self.image = pg.Surface((20, bird.rect.height * 2), pg.SRCALPHA)
+        self.image.fill((0, 0, 255, 255))
+
+        vx, vy = bird.dire
+        angle = math.degrees(math.atan2(-vy, vx))
+        self.image = pg.transform.rotozoom(self.image, angle, 1.0)
+
+        self.rect = self.image.get_rect()
+        self.rect.center = bird.rect.center
+        self.rect.move_ip(vx * bird.rect.width, vy * bird.rect.height)
+
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+    
+
 
 class Score:
     """
@@ -424,6 +447,14 @@ def main():
                 pg.display.update()
                 time.sleep(2)
                 return
+        
+        if key_lst[pg.K_s] and score.value > 50 and len(shields) == 0:
+            score.value -= 50
+            shields.add(Shield(bird, 400))
+
+        shields.update()
+        shields.draw(screen)
+        pg.sprite.groupcollide(bombs, shields, True, False)
 
         
         if pg.sprite.spritecollide(bird, bombs, True):
